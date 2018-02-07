@@ -238,16 +238,21 @@ Another note to the widening process that it makes sense to analyze the branch w
 \begin{lstlisting}
 int num();
 void foo() {
-int n = 0;
-for (int i = 0; i < num(); ++i) {
-++n;
-for (int j = 0; j < 4; ++j) {
-/*body that does not change n*/
-}
-}
-/*rest of the function, n <= 1 */
+ int n = 0;
+ int i;
+ for (i = 0; i < num(); ++i) {
+   if (i == 7) {
+     break;
+   }
+   for (int j = 0; j < 4; ++j) {/* */}
+ }
+ int n = 1/(7-k); // Possible division by zero
 }
 \end{lstlisting}
+
+This way the analyzer will produce a path where the value of \texttt{i} is known to be 7, so it will be able find the possible division by zero error.
+
+TODO: was important to be incremental
 
 \section{Measurements}
 \subsection{Loop Unrolling}
