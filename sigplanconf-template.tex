@@ -148,7 +148,7 @@ My aim was to address this issues and ...? (TODO: valami jo lezaromondat).
 
 \section{Solution}
 %The current loop handling method in the Clang Static Analyzer is too strict.
-In this section we present two solutions to resolve the previously mentioned limitations on symbolic execution of loops in the Clang Static Analyzer. /* TODO: ideirni h az examplek eroltetettek division by zero de ertitek naaah*/
+In this section we present two solutions to resolve the previously mentioned limitations on symbolic execution of loops in the Clang Static Analyzer. It is important to note that these enhancements are incremental in the sense that on examples which are too complex to handle at the moment, we fall back to the original method. For sake of simplicity in the following examples a "division by zero" will illustrate the bug we intend to find.
 
 \subsection{Loop Unrolling}
 Loop unrolling means we have worked up heuristics and patterns (such as loops with small number of branches and small known static bound) in order to find specific loops which are worth to be completely unrolled. This idea was inspired by the following example:
@@ -191,7 +191,7 @@ The final aim of widening is quite the same as the unrolling, to increase the co
    n = 1/n; // False positive:
             // Division by zero
    }
-}
+ }
 \end{lstlisting}
 In this case the analyzer will create and check that impossible path where the variable \texttt{b} is false, so \texttt{n} is not incremented and lead into a division by zero error. Since this execution path would never be performed while running the analyzed program, it is considered a false positive. My aim was to give a more precise approach for widening.
 
@@ -212,6 +212,7 @@ This approach helps us to cover cases and find bugs like the below example shows
    }
 }
 \end{lstlisting}
+
 We find the bug since we invalidate the known informations on variable \texttt{n} (and \texttt{i} as well). This cause the analyzer to create a branch where it checks the body of the \texttt{if} statement and finds the bug.
 However, this solution has its own limitations when dealing with nested loops. Consider the following case:
 
@@ -252,9 +253,8 @@ void foo() {
 
 This way the analyzer will produce a path where the value of \texttt{i} is known to be 7, so it will be able find the possible division by zero error.
 
-TODO: was important to be incremental
-
 \section{Measurements}
+
 \subsection{Loop Unrolling}
 \subsection{Loop Widening}
 \section{Conclusion}
