@@ -150,9 +150,9 @@ The budget is a collection of limitations on the shape of the ExplodedGraph. The
 As already mentioned in the introduction, the analyzer handles loops quite simply in the current state. More precisely, it unrolls them 4 times by default and then cuts the analysis of the path where the loop would have been unrolled more than 4 times.
 
 Loss in code coverage is one of the problems with this approach to loop modeling. Specifically, in cases where the loop is statically known to make more than 4 steps, the analyzer do not analyze the code following the loop. Thus, the naive loop handling (described above) could lead to entirely unchecked code.
-Here is a small example for that:
+Listing \ref{UnrollMot} shows a small example for that.
 
-\lstset{language=C,caption={Dude},label=DescriptiveLabel}
+\lstset{language=C,caption={In the current state of the analyzer the 'rest of the function' part will not be checked.},label=UnrollMot}
 \begin{lstlisting}
  void foo() {
    int arr[6];
