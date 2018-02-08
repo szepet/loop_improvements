@@ -152,7 +152,7 @@ As already mentioned in the introduction, the analyzer handles loops quite simpl
 Loss in code coverage is one of the problems with this approach to loop modeling. Specifically, in cases where the loop is statically known to make more than 4 steps, the analyzer do not analyze the code following the loop. Thus, the naive loop handling (described above) could lead to entirely unchecked code.
 Listing \ref{UnrollMot} shows a small example for that.
 
-\lstset{language=C,caption={In the current state of the analyzer the 'rest of the function' part will not be checked.},label=UnrollMot}
+\lstset{language=C,caption={Since the loop condition is known at every iteration, the analyzer will not check the 'rest of the function' part in the current state.},label=UnrollMot}
 \begin{lstlisting}
  void foo() {
    int arr[6];
@@ -164,8 +164,8 @@ Listing \ref{UnrollMot} shows a small example for that.
 \end{lstlisting}
 
 According to the budget rule concerning the basic block visit number, the analysis of the loop stops in the fourth iteration even if the loop condition is simple enough to see that unrolling the whole loop would not be too much extra work relatively. Running out of the budget implies (in this case) that the rest of the function body remains unanalyzed, which may lead to not finding potential bugs.
-Another problem can be seen on the following example:
-\lstset{language=C,caption={Descriptive Caption Text},label=DescriptiveLabel}
+Another problem can be seen on Listing \ref{WidenMot}:
+\lstset{language=C++,caption={The loop condition is unknown but the analyzer will not generate a simulation path where n $\ge$ 4 (which can result coverage loss).},label=WidenMot}
 \begin{lstlisting}
  int num();
  void foo()
@@ -188,6 +188,7 @@ In this section we present two solutions to resolve the previously mentioned lim
 \subsection{Loop Unrolling Heuristics}
 Loop unrolling means we have identified heuristics and patterns (such as loops with small number of branches and small known static bound) in order to find specific loops which are worth to be completely unrolled. This idea is inspired by the following example:
 
+\lstset{language=C++,caption={Complete unrolling of the loop makes possible to find the division by zero error.},label=UnrollEx}
 \begin{lstlisting}
  void foo() {
    for (int i = 0; i < 6; i++){
@@ -210,8 +211,9 @@ In the current solution a loop has to fulfill the following conditions in order 
 Using this method we can successfully find the bug on the above example.
 
 \subsection{Loop Widening}
-The final aim of widening is quite the same as the unrolling, to increase the coverage of the analysis. However, it reaches it in a very different way. During widening the analyzer simulates the execution of an arbitrary number of iterations. There is already a solution which reaches this behavior by discarding all of the known information before the last step of the loop. So, the analyzer creates the paths for the first 3 steps and simulate them as usual, but the widening (means the invalidating) happens before the 4th step in order to not lose the first precise simulation branches. This way the coverage will be increased but can easily result in too much false positives. Consider the following example:
+The final aim of widening is quite the same as the unrolling, to increase the coverage of the analysis. However, it reaches it in a very different way. During widening the analyzer simulates the execution of an arbitrary number of iterations. There is already a solution which reaches this behavior by discarding all of the known information before the last step of the loop. So, the analyzer creates the paths for the first 3 steps and simulate them as usual, but the widening (means the invalidating) happens before the 4th step in order to not lose the first precise simulation branches. This way the coverage will be increased but can easily result in too much false positives. Consider the example on Listing \ref{WidenProb}.
 
+\lstset{language=C++,caption={Invalidating every known information (even the ones which are not modified by the loop) can easily result false positives.},label=WidenProb}
 \begin{lstlisting}
  int num();
  void foo() {
@@ -231,8 +233,9 @@ In this case the analyzer will create and check that impossible path where the v
 
 The principles are that we try to continue the analysis after the block visiting budget is exhausted but invalidate the information only on the variables which are possibly modified by the loop. 
 For this I developed a solution which checks every possible way in which a variable can be modified in the loop. Then it evaluates these cases and if it encounters a modified variable which cannot be handled by the invalidation process (e.g.: a pointer variable) then the loop will not be widened and we return to the conservative method. This mechanism ensures that we do not create nodes containing invalid states.
-This approach helps us to cover cases and find bugs like the below example shows, and still not report false positives which are represented in the previous example.
+This approach helps us to cover cases and find bugs like the one illustrated on Listing \ref{WidenEx}, and still not report false positives which are represented on Listing \ref{WidenProb}.
 
+\lstset{language=C++,caption={Invalidating the information on only the possible changed variables can result higher coverage (while limiting the number of the found false positives).}, label=WidenEx}
 \begin{lstlisting}
  int num();
  void foo() {
@@ -248,8 +251,8 @@ This approach helps us to cover cases and find bugs like the below example shows
 \end{lstlisting}
 
 We find the bug since we invalidate the known informations on variable \texttt{n} (and \texttt{i} as well). This cause the analyzer to create a branch where it checks the body of the \texttt{if} statement and finds the bug.
-However, this solution has its own limitations when dealing with nested loops. Consider the following case:
-
+However, this solution has its own limitations when dealing with nested loops. Consider the case on Listing \ref{WidenEx2}.
+\lstset{language=C++,caption={The naive widening method does not handle well the nested loops. In this example the outer loop will not be widened.},label=WidenEx2}
 \begin{lstlisting}
  int num();
  void foo() {
@@ -266,10 +269,11 @@ However, this solution has its own limitations when dealing with nested loops. C
 
 In this scenario, when the analyzer first step into the outer loop (so, assumes that \texttt{i < num()} is true) and encounter the inner loop, then it consumes its (own) block visiting budget. (This implies that it will be widened, although in this case it means that only the inner loop counter (\texttt{j}) information is discarded.) After that we move on to the next iteration, and assume that we are on the path where the outer loop condition is true again. Because we already exhausted the budget in the previous iteration, the next visit of the first basic block of the inner loop (the condition) means that this path will be completely cut off and not analyzed. This results that the outer loop will not reach the step number where it would been widened. Furthermore, the outer loop will not even reach the 3rd step and the 2nd is stopped at in its body as well (as described above). This causes the problem, that even though we use the loop widening method, we will analyze the rest of the function with the assumption \texttt{n <= 1}.
 
-In order to deal with the above described nested loop problem, I have implemented a replay mechanism. This means that whenever we encounter an inner loop which already consumed its budget, we replay the analysis process of the current step of the outer loop but performing a widening first. This ensures the creation of a path which assumes that the condition is false and simulates the execution after the loop while the possibly changed information are discarded. This way the analyzer will not exclude some prunable path because of the simple loop handling which solves the problem.
+In order to deal with the above described nested loop problem, I have implemented a replay mechanism. This means that whenever we encounter an inner loop which already consumed its budget, we replay the analysis process of the current step of the outer loop but performing a widening first. This ensures the creation of a path which assumes that the condition is false and simulates the execution after the loop while the possibly changed information are discarded. This way the analyzer will not exclude some feasible path because of the simple loop handling which solves the problem.
 
-Another note to the widening process that it makes sense to analyze the branch where the condition is true with the widened State as well. The following example shows a case where this is useful:
+Another note to the widening process that it makes sense to analyze the branch where the condition is true with the widened State as well. The example on Listing \ref{WidenNested} shows a case where this is useful.
 
+\lstset{language=C++,caption={The replay mechanism successfully helps us to find the possible error the outer loop.},label=WidenNested}
 \begin{lstlisting}
 int num();
 void foo() {
@@ -281,7 +285,7 @@ void foo() {
    }
    for (int j = 0; j < 4; ++j) {/* */}
  }
- int n = 1/(7-k); // Possible division by zero
+ int n = 1 / (7 - k); // Possible division by zero
 }
 \end{lstlisting}
 
