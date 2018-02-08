@@ -34,6 +34,38 @@
 \usepackage[english]{babel}
 \addto\captionsenglish{\renewcommand{\figurename}{Example}}
 \usepackage{listings}  
+\usepackage{color}
+\usepackage[inline]{enumitem}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\definecolor{mygrayback}{rgb}{0.9,0.9,0.9}
+\lstset{ %
+	backgroundcolor=\color{mygrayback},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
+	basicstyle=\small,        % the size of the fonts that are used for the code
+	breakatwhitespace=false,
+	breaklines=true, 
+	captionpos=b,
+	commentstyle=\color{mygreen},    % comment style
+	extendedchars=true,              % lets you use 
+	%frame=single,	                   % adds a frame 
+	keepspaces=true,                 % keeps spaces in 
+	keywordstyle=\color{blue},       % keyword style
+	language=C++,                 %
+	numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+	numbersep=5pt,                   % how far the line-numbers are from the code
+	numberstyle=\footnotesize\color{mygray}, % the style that is used for the line-numbers
+	rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+	showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+	showstringspaces=false,          % underline spaces within strings only
+	showtabs=false,                  % show tabs within strings adding particular underscores
+	stepnumber=1,                    % the step between two line-numbers. If it's 1, each line will be numbered
+	stringstyle=\color{mymauve},     % string literal style
+	tabsize=2,	                   % sets default tabsize to 2 spaces
+	title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
 \newcommand{\cL}{{\cal L}}
 \hyphenation{Exploded-Graph}
 
@@ -77,7 +109,12 @@
 \maketitle
 
 \begin{abstract}
-TODO: Kell-e es ha igen, akkor mi legyen a bevezetovel?
+The LLVM Clang Static Analyzer is a source code analysis tool to find bugs in C, C++, and Objective-C programs using symbolic execution, i.e. it simulates the possible execution paths of the code. Currently the simulation of the loops is somewhat naive (but efficient), unrolling the loops for a predefined constant time. However, this approach can result in loss of coverage in various cases. This study aims to introduce two alternative approaches which can extend the current one and can be applied simultaneously: 
+\begin{enumerate*} [label={(\arabic*)}, noitemsep]
+	\item with applied heuristics we determine loops worth to fully unroll
+	\item we use a widening mechanism to simulate arbitrary step of iteration.
+\end{enumerate*}
+These methods were evaluated on numerous open source projects, and were proved to increase coverage in most of the cases. This work also laid the infrastructure for future loop modeling improvements.
 \end{abstract}
 
 % 2012 ACM Computing Classification System (CSS) concepts
@@ -94,12 +131,9 @@ TODO: Kell-e es ha igen, akkor mi legyen a bevezetovel?
 %\category{F.3.2}{Logics and Meanings of Programs}{Semantics of Programming Languages}[Program analysis]
 
 \keywords
-keyword1, keyword2
+keyword1, keyword2 TODO
 
 \section{Introduction}
-The Clang Static Analyzer is a source code analysis tool that finds bugs in C, C++, and Objective-C programs. In order to find bugs it simulates the possible execution paths of a code. Currently the simulation of the loops is somewhat naive (but efficient), however, this approach can result in loss of coverage in various cases. This study aims to give two alternate approaches which can extend the current one and can be used simultaneously. These methods were tested and measured on numerous open source projects, and were found to increase coverage on most of them. A similarly important aspect of the project is that it laid the infrastructure for future improvements.
-
-\section{State of the Art}
 The Clang Static Analyzer finds bugs by performing a symbolic execution on the code. During symbolic execution, the program is being interpreted, on a function-by-function basis, without any knowledge about the runtime environment. It builds up and traverses an inner model of the execution paths, called ExplodedGraph, for every analyzed function. A node of this graph (called ExplodedNode) contains a ProgramPoint (which determines the location) and a State (which contains the known information at that point).  Its paths from the root to the leaves are modeling the different execution paths of the analyzed function. Whenever the execution encounters a branch, a corresponding branch will be created in the ExplodedGraph during the simulated interpretation. Hence, branches lead to an exponential number of ExplodedNodes.
 This combinatorial explosion is handled in the Static Analyzer by stopping the analysis when given conditions are fulfilled. Ceasing the analyzation process may cause loss of potential true positive results, but it is indispensable for maintaining a reasonable resource consumption regarding the memory and CPU usage. These conditions are modeled by the concept of budget.
 The budget is a collection of limitations on the shape of the ExplodedGraph. These limitations include:
@@ -117,6 +151,8 @@ As already mentioned in the introduction, the analyzer handles loops quite simpl
 
 Loss in code coverage is one of the problems with this approach to loop modeling. Specifically, in cases where the loop is statically known to make more than 4 steps, the analyzer do not analyze the code following the loop. Thus, the naive loop handling (described above) could lead to entirely unchecked code.
 Here is a small example for that:
+
+\lstset{language=C,caption={Dude},label=DescriptiveLabel}
 \begin{lstlisting}
  void foo() {
    int arr[6];
@@ -129,6 +165,7 @@ Here is a small example for that:
 
 According to the budget rule concerning the basic block visit number, the analysis of the loop stops in the fourth iteration even if the loop condition is simple enough to see that unrolling the whole loop would not be too much extra work relatively. Running out of the budget implies (in this case) that the rest of the function body remains unanalyzed, which may lead to not finding potential bugs.
 Another problem can be seen on the following example:
+\lstset{language=C,caption={Descriptive Caption Text},label=DescriptiveLabel}
 \begin{lstlisting}
  int num();
  void foo()
@@ -144,14 +181,12 @@ Another problem can be seen on the following example:
 This code fragment results an analysis which keep track the values of \texttt{n} and \texttt{i} variables (this information is stored in the State). In every iteration of the loop the values are updated accordingly. Note that updating the State means a new node insertion in the ExplodedGraph with the new values. Since the body of the \texttt{num()} function is not known, the analyzer can not find out the its return value. Thus, it is considered as unknown. This circumstance makes the graph split to two branches. The first one belongs to the symbolic execution of the loop body assuming that the loop condition is true. The other one simulates the case where the condition is false and the execution continues after the loop. This process is done for every loop iteration, however, the 4th time assuming the condition is true, the path will be cut short according to the budget rule.
 Although the analyzer generates paths to simulate the code after the loop in the above described case, yet the value of variable \texttt{n} will be always less than 4 on these paths and the rest of the function will only be checked assuming this constraint. This can result in coverage loss as well, since the analyzer will ignore the paths where n is more than 4.
 
-My aim was to address this issues and ...? (TODO: valami jo lezaromondat). 
-
-\section{Solution}
+\section{Proposed Solution}
 %The current loop handling method in the Clang Static Analyzer is too strict.
 In this section we present two solutions to resolve the previously mentioned limitations on symbolic execution of loops in the Clang Static Analyzer. It is important to note that these enhancements are incremental in the sense that on examples which are too complex to handle at the moment, we fall back to the original method. For sake of simplicity in the following examples a "division by zero" will illustrate the bug we intend to find.
 
-\subsection{Loop Unrolling}
-Loop unrolling means we have worked up heuristics and patterns (such as loops with small number of branches and small known static bound) in order to find specific loops which are worth to be completely unrolled. This idea was inspired by the following example:
+\subsection{Loop Unrolling Heuristics}
+Loop unrolling means we have identified heuristics and patterns (such as loops with small number of branches and small known static bound) in order to find specific loops which are worth to be completely unrolled. This idea is inspired by the following example:
 
 \begin{lstlisting}
  void foo() {
@@ -166,9 +201,8 @@ Loop unrolling means we have worked up heuristics and patterns (such as loops wi
 
 In the current solution a loop has to fulfill the following conditions in order to be unrolled:
 \begin{enumerate}  
-	\item The loop condition should be simple (like: \texttt{i~<~6} or \texttt{6~>=~i})
-	\item The bound has to be a constant (eg. 6) and the counter variable (\texttt{i}) has to be known at the beginning of the loop.
-	\item The loop should only change once the counter variable in its body and the difference needs to be constant. (This way we can estimate the maximum number of steps.)
+	\item The loop condition should be arithmetically compare a variable -- which is known at the beginning of the loop -- to a literal (like: \texttt{i~<~6} or \texttt{6~$\ge$~i})
+	\item The loop should only change once the loop variable in its body and the difference needs to be constant. (This way we can estimate the maximum number of steps.)
 	\item The estimated number of steps should be less than 128. (Still do not want to simulate loops which takes thousands of steps because they could single handedly exhaust the budget.)
 	\item The loop must not generate new branches or use \texttt{goto} statements.
 \end{enumerate}
@@ -253,7 +287,9 @@ void foo() {
 
 This way the analyzer will produce a path where the value of \texttt{i} is known to be 7, so it will be able find the possible division by zero error.
 
-\section{Measurements}
+\section{Evaluation}
+
+The effect of the described loop modeling approaches were measured on various C/C++ open source project.  
 
 \subsection{Loop Unrolling}
 \subsection{Loop Widening}
