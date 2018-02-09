@@ -1,25 +1,3 @@
-%-----------------------------------------------------------------------------
-%
-%               Template for sigplanconf LaTeX Class
-%
-% Name:         sigplanconf-template.tex
-%
-% Purpose:      A template for sigplanconf.cls, which is a LaTeX 2e class
-%               file for SIGPLAN conference proceedings.
-%
-% Guide:        Refer to "Author's Guide to the ACM SIGPLAN Class,"
-%               sigplanconf-guide.pdf
-%
-% Author:       Paul C. Anagnostopoulos
-%               Windfall Software
-%               978 371-2316
-%               paul@windfall.com
-%
-% Created:      15 February 2005
-%
-%-----------------------------------------------------------------------------
-
-
 \documentclass{sigplanconf}
 
 % The following \documentclass options may be useful:
@@ -90,7 +68,7 @@ title=\lstname                   % show the filename of files included with
 \setlength{\pdfpageheight}{\paperheight}
 \setlength{\pdfpagewidth}{\paperwidth}
 
-\conferenceinfo{EuroLLVM}{April d--d, 2018, Bristol, England}
+\conferenceinfo{EuroLLVM}{April 16--17, 2018, Bristol, England}
 \copyrightyear{2018}
 \copyrightdata{978-1-nnnn-nnnn-n/yy/mm}\reprintprice{\$15.00}
 \copyrightdoi{nnnnnnn.nnnnnnn}
@@ -123,8 +101,7 @@ title=\lstname                   % show the filename of files included with
 %{Email2/3}
 
 \maketitle
-% TODO code examples, infrastructure, explodedgraph example, Eval, reference, 
-%acknowledgment
+% TODO infrastructure, explodedgraph example, Eval, reference, acknowledgment
 
 \begin{abstract}
 The LLVM Clang Static Analyzer is a source code analysis tool which aims to 
@@ -138,7 +115,7 @@ various cases.
 This study aims to introduce two alternative approaches which can 
 extend the current one and can be applied simultaneously: 
 \begin{enumerate*} [label={(\arabic*)}, noitemsep]
-	\item loops worth to fully unroll were determined with applied heuristics
+	\item determining loops worth to fully unroll with applied heuristics
 	\item using a widening mechanism to simulate an arbitrary number of step of 
 	iteration.
 \end{enumerate*}
@@ -176,14 +153,14 @@ based on the \texttt{Control Flow Graph} (\texttt{CFG}) of the functions. The
 \texttt{CFG} represents a source-level, intra-procedural control-flow of a 
 statement. This statement can potentially be an entire function body, or just a 
 single expression. The \texttt{CFG} consists of \texttt{CFGBlocks} which are 
-simply containers of statements. The \texttt{CFGBlocks}s essentially represents 
-the basic blocks of the code but can contain some extra custom information. So 
-for the sake of easier understanding TODO amikor azt mondjuk, hogy basic block, 
-akkor CFGBlock-ra gondolunk, de ez segit elkepzelni/ jobban 
-kifejezni/szemleletesebbe teszi a peldakat, ha basic blockot kepzelunk magunk 
-ele.
+simply containers of statements. The \texttt{CFGBlocks}s essentially represent 
+the basic blocks of the code but can contain some extra custom information. 
+Although basic blocks and \texttt{CFGBlocks} are technically different, in the 
+rest of the article we will use the term of basic blocks for \texttt{CFGBlocks} 
+as well for the sake easier understanding and better illustration.
 
-So -- based on the function CFGs -- we build up an \texttt{ExplodedGraph}. A 
+So during the analysis -- based on the function CFGs -- we build up an 
+\texttt{ExplodedGraph}. A 
 node of this graph (called \texttt{ExplodedNode}) contains a 
 \texttt{ProgramPoint} (which determines the location) and a \texttt{State} 
 (which contains the known information at that point). Its paths from the root 
@@ -245,11 +222,11 @@ Listing \ref{UnrollMot} shows a small example for that.
 		current state.},label=UnrollMot}
 \begin{lstlisting}
 void foo() {
-int arr[6];
-for (int i = 0; i < 6; i++){
-arr[i] = i;
-}
-/*rest of the function*/
+  int arr[6];
+  for (int i = 0; i < 6; i++) {
+    arr[i] = i;
+  }
+  /*rest of the function*/
 }\end{lstlisting}
 
 According to the budget rule concerning the basic block visit number, the
@@ -266,13 +243,12 @@ analyzer
 		loss).},label=WidenMot}
 \begin{lstlisting}
 int num();
-void foo()
-{
-int n = 0;
-for (int i = 0; i < num(); ++i) {
-++n;
-}
-/*rest of the function, n < 4 */
+void foo() {
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+  }
+  /*rest of the function, n < 4 */
 }\end{lstlisting}
 
 This code fragment results in an analysis which keeps track of the values of 
@@ -302,8 +278,7 @@ since the analyzer will ignore the paths where n is more than 4.
 In this section two solutions are presented to resolve the previously mentioned
 limitations on symbolic execution of loops in the Clang Static Analyzer. It 
 is important to note that these enhancements are incremental in the sense 
-that 
-on examples which are too complex to handle at the moment, we fall back to 
+that on examples which are too complex to handle at the moment, we fall back to 
 the original method. For the sake of simplicity in the following examples a 
 "division by zero" will illustrate the bug we intend to find.
 
@@ -318,16 +293,15 @@ inspired by the following example:
 to find the division by zero error.},label=UnrollEx}
 \begin{lstlisting}
 void foo() {
-for (int i = 0; i < 6; i++){
-/*simple loop which does not
-change 'i' or split the state*/
-}
-int k = 0;
-int l = 2/k; // Division by zero
+  for (int i = 0; i < 6; i++) {
+    /*simple loop which does not
+    change 'i' or split the state*/
+  }
+  int k = 0;
+  int l = 2/k; // Division by zero
 }\end{lstlisting}
 
-In the current solution a loop has to fulfill the following conditions in 
-order
+In the current solution a loop has to fulfill the following conditions in order 
 to be unrolled:
 \begin{enumerate}  
 	\item The loop condition should arithmetically compare a variable -- 
@@ -367,16 +341,15 @@ positives.},label=WidenProb}
 \begin{lstlisting}
 int num();
 void foo() {
-bool b = true;
-for (int i = 0; i < num(); ++i) {
-/*does not changes 'b'*/
-}
-int n = 0;
-if (b)
-n++;
-n = 1/n; // False positive:
-// Division by zero
-}
+  bool b = true;
+  for (int i = 0; i < num(); ++i) {
+    /*does not changes 'b'*/
+  }
+  int n = 0;
+  if (b)
+    n++;
+  n = 1/n; // False positive:
+           // Division by zero
 }\end{lstlisting}
 In this case the analyzer will create and check that unfeasible path where 
 the
@@ -389,32 +362,30 @@ was to give a more precise approach for widening.
 The principles are that we try to continue the analysis after the block 
 visiting budget is exhausted but invalidate the information only on the 
 variables which are possibly modified by the loop. 
-For this I developed a solution which checks every possible way in which a
-variable can be modified in the loop. Then it evaluates these cases and if 
-it encounters a modified variable which cannot be handled by the invalidation
+For this I developed a solution which checks every possible way in which a 
+variable can be modified in the loop. Then it evaluates these cases and if it 
+encounters a modified variable which cannot be handled by the invalidation 
 process (e.g.: a pointer variable) then the loop will not be widened and we
-return to the conservative method. This mechanism ensures that we do not 
-create nodes containing invalid states.
-This approach helps us to cover cases and find bugs like the one 
-illustrated on Listing \ref{WidenEx}, and still not report false positives 
-which are represented on Listing \ref{WidenProb}.
+return to the conservative method. This mechanism ensures that we do not create 
+nodes containing invalid states.
+This approach helps us to cover cases and find bugs like the one illustrated on 
+Listing \ref{WidenEx}, and still not report false positives which are 
+represented on Listing \ref{WidenProb}.
 
-\lstset{language=C++,caption={Invalidating the information on only the 
-possible 
-		changed variables can result higher coverage (while limiting the 
-		number of the 
-		found false positives).}, label=WidenEx}
+\lstset{language=C++,caption={Invalidating the information on only the possible 
+changed variables can result higher coverage (while limiting the number of the 
+found false positives).}, label=WidenEx}
 \begin{lstlisting}
 int num();
 void foo() {
-int n = 0;
-for (int i = 0; i < num(); ++i) {
-++n;
-}
-if (n > 4) {
-int k = 0;
-k = 1/k;  // Division by zero error
-}
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+  }
+  if (n > 4) {
+    int k = 0;
+    k = 1/k;  // Division by zero error
+  }
 }\end{lstlisting}
 
 We find the bug since we invalidate the known informations on variable
@@ -431,14 +402,14 @@ well
 \begin{lstlisting}
 int num();
 void foo() {
-int n = 0;
-for (int i = 0; i < num(); ++i) {
-++n;
-for (int j = 0; j < 4; ++j) {
-/*body that does not change n*/
-}
-}
-/*rest of the function, n <= 1 */
+  int n = 0;
+  for (int i = 0; i < num(); ++i) {
+    ++n;
+    for (int j = 0; j < 4; ++j) {
+      /*body that does not change n*/
+    }
+  }
+  /*rest of the function, n <= 1 */
 }\end{lstlisting}
 
 In this scenario, when the analyzer first step into the outer loop (so, assumes
@@ -474,15 +445,15 @@ Listing \ref{WidenNested} shows a case where this is useful.
 \begin{lstlisting}
 int num();
 void foo() {
-int n = 0;
-int i;
-for (i = 0; i < num(); ++i) {
-if (i == 7) {
-break;
-}
-for (int j = 0; j < 4; ++j) {/* */}
-}
-int n = 1 / (7 - k);
+  int n = 0;
+  int i;
+  for (i = 0; i < num(); ++i) {
+    if (i == 7) {
+      break;
+    }
+    for (int j = 0; j < 4; ++j) {/* */}
+  }
+  int n = 1 / (7 - k);
          // ^ Possible division by zero
 }\end{lstlisting}
 
@@ -490,8 +461,8 @@ This way the analyzer will produce a path where the value of \texttt{i} is
 known
 to be 7, so it will be able find the possible division by zero error.
 	
-\subsection{Infrastructure improvements}
-The discussed approaches heavily rely on informations that we are able to 
+\subsection{Infrastructure improvements}\label{sec:inf}
+The discussed approaches heavily rely on that we are able to 
 perform the following actions:
 \begin{enumerate}
 	\item Decide on any \texttt{ExplodedNode} if it simulates a body of a 
@@ -507,14 +478,14 @@ The \texttt{ProgramPoint} contains the \texttt{LocationContext}
 
 \section{Evaluation}
 
-The effect of the described loop modeling approaches were measured on 
-various C/C++ open source project. These are the following:
+The effect of the described loop modeling approaches were measured on various 
+C/C++ open source project. These are the following:
 
 \begin{tabular}{ |c||c|c| } 
 	\hline
 	Project & LoC & Language \\
 	\hline
-	TinyXml & 20k & C++ \\
+	TinyXML & 20k & C++ \\
 	\hline
 	Curl & 21k & C  \\ 
 	\hline
@@ -531,96 +502,151 @@ various C/C++ open source project. These are the following:
 	FFmpeg & 1080k & C \\ 		
 	\hline
 \end{tabular}
-\begin{center}
-\subsection{Coverage and the number of explored paths}
-\begin{tabular}{ |c||c|c|c|c| } 
-	\hline
-	Project & Normal & Unroll & Widen & U + W \\
-	\hline \hline
-	Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-	\hline
-	Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
-	\hline
-	Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-	\hline
-	Vim & 1 & 2 & 3 & 4 \\ 
-	\hline
-	OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
-	\hline
-	PostgreSQL & 1 & 2 & 3 & 4 \\ 
-	\hline
-	FFmpeg & 1 & 2 & 3 & 4 \\ 		
-	\hline
-\end{tabular}
 
+\subsection{Coverage and the number of explored paths}
+These statisics are produced by the analyzer (már benne van, ezt valahogy 
+ertelmesen elmondani, hogy ezert valid es nem en szoptam ossze az eterbol). The 
+coverage percentage is based on the ratio of the visited and the total number 
+of basic blocks in the analyzed functions. This results in a small imprecision. 
+An important note that the introduced loop modeling methods require to have the 
+additional loop entrance and exit point information (described in section 
+\ref{sec:inf}) in the \texttt{CFG}. This information can result in having more 
+basic block in the \texttt{CFG} and affect the statistics. Because of this, 
+even the statistics, which was produced by using the current loop modeling 
+approach, were measured with these information added to the \texttt{CFG}.
+
+These statics are generated for every 
+translation unit and then summarized. This means that the header files which 
+are included in more than one translation unit can influence more statistics.
+However, we use this summarization process consistently for every measurement, 
+this way the results reflect the reality.
+
+TODO: magyarázat Normal ->current app, Unroll->unroll, Widen->widen, U+W->both
+
+Table \ref{tab:cov} shows the coverage difference using the introduced 
+approaches.
+\begin{table}[!htb]
+	\centering
 \begin{tabular}{ |c||c|c|c|c| } 
 	\hline
 	Project & Normal & Unroll & Widen & U + W \\
 	\hline \hline
-	Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	TinyXML & 84.2 & 84.2 & 85.1 & 85.1 \\ 
+	\hline
+	Curl & 76.2 & 76.9 & 77.7 & 77.2 \\ 
 	\hline
 	Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
 	\hline
-	Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	Xerces & 92.3 & 92.4 & 92.7 & 92.7 \\ 
 	\hline
-	Vim & 1 & 2 & 3 & 4 \\ 
+	Vim & 60.4 & 60.6 &	60.6 & 60.7 \\ 
 	\hline
-	OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
+	OpenSSL & 97.4 & 97.5 & 97.7 & 97.7 \\ 
 	\hline
-	PostgreSQL & 1 & 2 & 3 & 4 \\ 
+	PostgreSQL & 76.9 &	77.0 & 76.9 & 76.9 \\ 
 	\hline
-	FFmpeg & 1 & 2 & 3 & 4 \\ 		
+	FFmpeg & 86.1 & 86.3 & 87.0 & 86.8 \\	
 	\hline
 \end{tabular}
+\caption{The code coverage of the analysis on the evaluated projects expressed 
+in percentage.}\label{tab:cov}
+\end{table}
+
+On most of the projects we managed to strictly increase the analysis coverage 
+using any of the described approaches. The widening method had a stronger 
+influence on the coverage in the average case. However, the complete unroll of 
+specific loops could result a higher coverage as well (e.g. Curl, Redis).
+In general, enabling both of them was the most beneficial in respect of the 
+coverage.
+
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 14452 & 15460 & 14765 &	15773  \\ 
+	\hline
+	Curl & 18272 & 18577 & 28835 & 24279 \\ 
+	\hline
+	Redis & 69857 & 70097 & 98446 & 100929 \\ 
+	\hline
+	Xerces & 395615 & 398077 & 430989 &	433358 \\ 
+	\hline
+	Vim & 155451 & 157266 & 188136 & 17311 \\ 
+	\hline
+	OpenSSL & 687175 & 687932 & 700464 & 701013 \\ 
+	\hline
+	PostgreSQL & 382660 & 383874 & 453188 & 419118  \\ 
+	\hline
+	FFmpeg & 466613 & 458480 & 571399 & 1041725  \\ 		
+	\hline
+\end{tabular}
+\caption{The number of explored paths using the different loop 
+approaches.}\label{tab:pathnum}
+\end{table}
 
 \subsection{Analysis time}
-	\begin{tabular}{ |c||c|c|c|c| } 
-		\hline
-		Project & Normal & Unroll & Widen & U + W \\
-		\hline \hline
-		Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-		\hline
-		Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
-		\hline
-		Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-		\hline
-		Vim & 1 & 2 & 3 & 4 \\ 
-		\hline
-		OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
-		\hline
-		PostgreSQL & 1 & 2 & 3 & 4 \\ 
-		\hline
-		FFmpeg & 1 & 2 & 3 & 4 \\ 		
-		\hline
-	\end{tabular}
-\subsection{Found bugs}
-	\begin{tabular}{ |c||c|c|c|c| } 
-		\hline
-		Project & Normal & Unroll & Widen & U + W \\
-		\hline \hline
-		Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-		\hline
-		Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
-		\hline
-		Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
-		\hline
-		Vim & 1 & 2 & 3 & 4 \\ 
-		\hline
-		OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
-		\hline
-		PostgreSQL & 1 & 2 & 3 & 4 \\ 
-		\hline
-		FFmpeg & 1 & 2 & 3 & 4 \\ 		
-		\hline
-	\end{tabular}
-\end{center}
+\begin{table}[!htb]
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
+	\hline
+	Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Vim & 1 & 2 & 3 & 4 \\ 
+	\hline
+	OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
+	\hline
+	PostgreSQL & 1 & 2 & 3 & 4 \\ 
+	\hline
+	FFmpeg & 1 & 2 & 3 & 4 \\ 		
+	\hline
+\end{tabular}
+\caption{The average measured time of the analysis expressed in minutes. 
+(Average of 5 run.)}\label{tab:time}
+\end{table}
 
+\subsection{Found bugs}
+\begin{table}
+	\centering
+\begin{tabular}{ |c||c|c|c|c| } 
+	\hline
+	Project & Normal & Unroll & Widen & U + W \\
+	\hline \hline
+	TinyXML & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
+	\hline
+	Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+	\hline
+	Vim & 1 & 2 & 3 & 4 \\ 
+	\hline
+	OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
+	\hline
+	PostgreSQL & 1 & 2 & 3 & 4 \\ 
+	\hline
+	FFmpeg & 1 & 2 & 3 & 4 \\ 		
+	\hline
+\end{tabular}
+\caption{The number of bugreports produced by the 
+analyzer.}\label{tab:reportnum}
+\end{table}
 \section{Conclusion}
 
 We introduced two alternative approaches for simulating loops during symbolic 
 execution. These were implemented and subsequently evaluated on various open 
 source projects, with a clear improvement of code coverage in general. With the 
-help of the new methods we are able to explore previously skipped, feasible 
+help of the new methods we are able to explore previously skipped, feasible  
 execution paths, especially when they were used combined. 
 
 The required changes done to the underlying infrastructure should also ease 
