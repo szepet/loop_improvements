@@ -101,9 +101,7 @@
 	%{Email2/3}
 	
 	\maketitle
-	% TODO infrastructure, explodedgraph example, Eval, reference, 
-	%acknowledgment
-	
+	% TODO infrastructure, explodedgraph example, Eval, reference
 	\begin{abstract}
 		The LLVM Clang Static Analyzer is a source code analysis tool which 
 		aims to 
@@ -155,13 +153,13 @@
 	function-by-function basis, without any knowledge about the runtime 
 	environment. It builds up and traverses an inner model of the execution 
 	paths, 
-	called ExplodedGraph, for every analyzed function.
+	called \texttt{ExplodedGraph}, for each analyzed function.
 	
 	An important technical note is that the building of the 
 	\texttt{ExplodedGraph} is 
 	based on the \texttt{Control Flow Graph} (\texttt{CFG}) of the functions. 
 	The 
-	\texttt{CFG} represents a source-level, intra-procedural control-flow of a 
+	\texttt{CFG} represents a source-level, intra-procedural control flow of a 
 	statement. This statement can potentially be an entire function body, or 
 	just a 
 	single expression. The \texttt{CFG} consists of \texttt{CFGBlocks} which 
@@ -171,11 +169,11 @@
 	the basic blocks of the code but can contain some extra custom information. 
 	Although basic blocks and \texttt{CFGBlocks} are technically different, in 
 	the 
-	rest of the article we will use the term of basic blocks for 
+	rest of the article we will use the term basic blocks for 
 	\texttt{CFGBlocks} 
-	as well for the sake easier understanding and better illustration.
+	as well for the sake of easier understanding and better illustration.
 	
-	So during the analysis -- based on the function CFGs -- we build up an 
+	During the analysis -- based on the function CFGs -- we build up an 
 	\texttt{ExplodedGraph}. A 
 	node of this graph (called \texttt{ExplodedNode}) contains a 
 	\texttt{ProgramPoint} (which determines the location) and a \texttt{State} 
@@ -549,9 +547,19 @@
 	unambiguously 
 	fit into the \texttt{CFG}. 
 	
-	TODO
-	
-	The \texttt{ProgramPoint} contains the \texttt{LocationContext}
+	The \texttt{ProgramPoint} provides the \texttt{LocationContext} which 
+	implements a stack data structure for having the information on the 
+	different locations of the code.  This implies that the callstack can be 
+	represented via this structure in a straightforward manner (and is 
+	contained by the \texttt{LocationContext}).
+	Since storing the currently simulated loops fits into a stack data 
+	structure as well, this information -- called \texttt{LoopContext} -- 
+	understandably was implemented as the part of the \texttt{LocationContext} 
+	too instead of having them in the \texttt{Store}. Both the \texttt{Store} 
+	and the \texttt{LocationContext} are part of an \texttt{ExplodedNode} in 
+	form of a pointer. However, these structures use copy-on-write semantics, 
+	and the \texttt{LocationContext} changes way less times, this decision 
+	saves us memory. 
 	
 	\section{Evaluation}
 	
@@ -559,7 +567,7 @@
 	various 
 	C/C++ open source projects. These are the following:
 	
-	\begin{tabular}{ |c||c|c| } 
+	\begin{tabular}{ |c||c|c| }
 		\hline
 		Project & LoC & Language \\
 		\hline
@@ -577,7 +585,7 @@
 		\hline
 		PostgreSQL & 950k & C \\ 
 		\hline
-		FFmpeg & 1080k & C \\ 		
+		FFmpeg & 1080k & C \\	
 		\hline
 	\end{tabular}
 	
@@ -611,8 +619,6 @@
 	and the hereby introduced loop unrolling (Unroll) and loop widening (Widen)
 	methods separately and simultaneously (U+W).
 	
-	Table \ref{tab:cov} shows the coverage difference using the introduced 
-	approaches.
 	\begin{table}[!htb]
 		\centering
 		\begin{tabular}{ |c||c|c|c|c| } 
@@ -641,7 +647,9 @@
 			in percentage.}\label{tab:cov}
 	\end{table}
 	
-	On most of the projects we managed to strictly increase analysis coverage 
+	Table \ref{tab:cov} shows the coverage difference using the introduced 
+	approaches. On most of the projects we managed to strictly increase 
+	analysis coverage 
 	using any of the proposed approaches. The widening method had a stronger 
 	influence on the coverage in the average case. However, the complete unroll 
 	of 
@@ -649,11 +657,9 @@
 	In general, enabling both of them was the most beneficial in respect of the 
 	coverage.
 	
-	Listing \ref{tab:pathnum} presents the numbers of analyzed execution paths.
-	
 	\begin{table}[!htb]
 		\centering
-		\begin{tabular}{ |c||c|c|c|c| } 
+		\begin{tabular}{ |c||r|r|r|r| } 
 			\hline
 			Project & Normal & Unroll & Widen & U + W \\
 			\hline \hline
@@ -665,20 +671,20 @@
 			\hline
 			Xerces & 395615 & 398077 & 430989 &	433358 \\ 
 			\hline
-			Vim & 155451 & 157266 & 188136 & 17311 \\ 
+			Vim & 155451 & 157266 & 188136 & 173121 \\ 
 			\hline
 			OpenSSL & 687175 & 687932 & 700464 & 701013 \\ 
 			\hline
 			PostgreSQL & 382660 & 383874 & 453188 & 419118  \\ 
 			\hline
-			FFmpeg & 466613 & 458480 & 571399 & 1041725  \\ 		
+			FFmpeg & 466613 & 458480 & 571399 & 521725  \\ 		
 			\hline
 		\end{tabular}
 		\caption{The numbers of explored execution paths using different loop 
 		modeling
 			approaches.}\label{tab:pathnum}
 	\end{table}
-	
+	Table \ref{tab:pathnum} presents the numbers of analyzed execution paths.
 	As expected, both introduced loop modeling methods resulted in a higher 
 	number of
 	simulated paths on (almost) all of the projects. The only exception is the 
@@ -686,10 +692,12 @@
 	approach on the FFmpeg project, which caused the budget limiting the number 
 	of 
 	traversed \texttt{ExplodedNode}s to exhaust earlier, slightly decreasing 
-	the number of checked paths.
+	the number of checked paths. Enabling both of the features resulted similar 
+	or less number of explored than the runs using only widening. It was the 
 	
 	\subsection{Found bugs}
-	\begin{table}
+	
+	\begin{table}[!htb]
 		\centering
 		\begin{tabular}{ |c||c|c|c|c| } 
 			\hline
@@ -705,44 +713,53 @@
 			\hline
 			Vim & 74 & 74 & 76 & 78 \\
 			\hline
-			OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
+			OpenSSL & 152 & 152 & 153 & 153 \\ 
 			\hline
-			PostgreSQL & 1 & 2 & 3 & 4 \\ 
+			PostgreSQL & 323 & 323 & 327 & 331 \\ 
 			\hline
-			FFmpeg & 1 & 2 & 3 & 4 \\ 		
+			FFmpeg & 425 & 420 & 423 & 454 \\ 		
 			\hline
 		\end{tabular}
-		\caption{The number of bug reports produced by the 
-			analyzer.}\label{tab:reportnum}
+		\caption{The number of bug reports produced by the analyzer.} 
+		\label{tab:reportnum}
 	\end{table}
-	
+	The number of bug reports using the different loop modeling methods can be 
+	seen
+	on Table \ref{tab:reportnum}. The increase in analysis coverage and number 
+	of checked path usually implies that the number of the found bugs will be 
+	increased as well. This can be observed on these numbers as well, however,
+	the increase rate of the found bugs is higher. But if we figyelembe 
+	vesszuk, that how much more paths we simulated.
 	\subsection{Analysis time}
+	
 	\begin{table}[!htb]
 		\centering
 		\begin{tabular}{ |c||c|c|c|c| } 
 			\hline
 			Project & Normal & Unroll & Widen & U + W \\
 			\hline \hline
-			TinyXML & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+			TinyXML & 0:51 & 0:51 & 0:52 & 0:52 \\ 
 			\hline
-			Curl & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+			Curl & 0:50 & 1:06 & 0:55 & 1:10 \\ 
 			\hline
-			Redis & 68.5 & 69.1 & 68.5 & 71.3 \\ 
+			Redis & 2:06 & 2:11 & 2:28 & 2:10 \\ 
 			\hline
-			Xerces & 92.2 & 92.3 & 92.7 & 92.7 \\ 
+			Xerces & 3:38 & 3:34 & 3:37 & 3:39 \\ 
 			\hline
-			Vim & 1 & 2 & 3 & 4 \\ 
+			Vim & 3:11 & 3:26 & 3:18 & 3:27 \\ 
 			\hline
-			OpenSSL & 97.4 & 2 & 3 & 98.0 \\ 
+			OpenSSL & 2:04 & 2:22 & 2:13 & 2:19 \\ 
 			\hline
-			PostgreSQL & 1 & 2 & 3 & 4 \\ 
+			PostgreSQL & 7:03 & 8:32 & 7:48 & 7:59 \\ 
 			\hline
-			FFmpeg & 1 & 2 & 3 & 4 \\ 		
+			FFmpeg & 9:40 & 10:22 & 10:14 & 11:20 \\ 		
 			\hline
 		\end{tabular}
 		\caption{Average measured time of the analysis expressed in minutes. 
 			(Average of 5 runs.)}\label{tab:time}
 	\end{table}
+	The running time on the different projects are represented on Table 
+	\ref{tab:time}.
 	
 	\section{Conclusion}
 	
@@ -770,40 +787,6 @@
 	increased proportionally with the time taken, suggesting this time was well 
 	spent.
 	
-	
-	%Analysis of loops is always a hard task thus compromises have to be made.
-	% In
-	%Static Analyzer the technique of symbolic execution is used to simulate 
-	%dynamic 
-	% behavior in static time by limiting the number of iterations the analyzer 
-	%does. 
-	%This method fits in the current toolset which makes it implementable very 
-	%easy.
-	
-	%In this article I managed to extend the nodes of the exploded graph by 
-	%some 
-	%custom information about loop processing and I implemented two methods by 
-	%which 
-	%a bigger coverage could be reached. Unrolling the not too complex loops 
-	%based 
-	%on some heuristics made it possible to continue the analysis after the 
-	%loops 
-	%and widening loops made it possible to determine variable constraints 
-	%which 
-	%are 
-	%closer to reality.
-	
-	%This study introduced two alternative approaches which can 
-	%extend the current one and can be applied simultaneously: 
-	%\begin{enumerate*} [label={(\arabic*)}, noitemsep]
-	%	\item with applied heuristics we determine loops worth to fully 
-	%	unroll
-	%	\item we use a widening mechanism to simulate arbitrary step of 
-	%	iteration.
-	%\end{enumerate*}
-	%These methods were evaluated on numerous open source projects, and were 
-	%proved to increase coverage in most of the cases. This work also laid the
-	%infrastructure for future loop modeling improvements.
 	\section{Future work}
 	The heuristic patterns for completely unrolled loops could be extended to 
 	involve loops whose bound is a known variable which is not changed in the 
@@ -832,8 +815,12 @@
 	points new checkers can be implemented.
 	
 	\acks
-	
-	Acknowledgments, if needed.
+	I would like to thank my main mentor of GSoC, Artem Dergachev for his 
+	advices and guidance on getting to know the core of the Static Analyzer. 
+	Furthermore, I would like to thank the members of the CodeChecker team from 
+	Ericsson for their valueable and useful suggestions on the paper. 
+	%especially for my honoured and best friend, master of C++ and all 
+	%information sciences, Tibor Brunner. 
 	
 	% The 'abbrvnat' bibliography style is recommended.
 	
