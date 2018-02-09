@@ -123,30 +123,27 @@ title=\lstname                   % show the filename of files included with
 %{Email2/3}
 
 \maketitle
+% TODO code examples, infrastructure, explodedgraph example, Eval, reference, 
+%acknowledgment
 
 \begin{abstract}
-The LLVM Clang Static Analyzer is a source code analysis tool to find 
-bugs in C,
-C++, and Objective-C programs using symbolic execution, i.e. it 
-simulates the
-possible execution paths of the code. Currently the simulation of the 
-loops is
-somewhat naive (but efficient), unrolling the loops for a predefined 
-constant
-time. However, this approach can result in loss of coverage in various 
-cases.
+The LLVM Clang Static Analyzer is a source code analysis tool which aims to 
+find bugs in C,
+C++, and Objective-C programs using symbolic execution, i.e. it simulates the
+possible execution paths of the code. Currently the simulation of the loops is
+somewhat naive (but efficient), unrolling the loops a predefined constant 
+number of times. However, this approach can result in loss of coverage in 
+various cases.
+
 This study aims to introduce two alternative approaches which can 
-extend the
-current one and can be applied simultaneously: 
+extend the current one and can be applied simultaneously: 
 \begin{enumerate*} [label={(\arabic*)}, noitemsep]
-	\item with applied heuristics we determine loops worth to fully 
-	unroll
-	\item we use a widening mechanism to simulate arbitrary step of 
+	\item loops worth to fully unroll were determined with applied heuristics
+	\item using a widening mechanism to simulate an arbitrary number of step of 
 	iteration.
 \end{enumerate*}
 These methods were evaluated on numerous open source projects, and were 
-proved
-to increase coverage in most of the cases. This work also laid the
+proved to increase coverage in most of the cases. This work also laid the
 infrastructure for future loop modeling improvements.
 \end{abstract}
 
@@ -169,33 +166,43 @@ static analysis, symbolic execution, loop modeling
 
 \section{Introduction}
 The Clang Static Analyzer finds bugs by performing a symbolic execution on 
-the
-code. During symbolic execution, the program is being interpreted, on a
+the code. During symbolic execution, the program is being interpreted, on a
 function-by-function basis, without any knowledge about the runtime 
-environment.
-It builds up and traverses an inner model of the execution paths, called
-ExplodedGraph, for every analyzed function. A node of this graph (called
-ExplodedNode) contains a ProgramPoint (which determines the location) and a
-State (which contains the known information at that point).  Its paths from 
-the
-root to the leaves are modeling the different execution paths of the 
-analyzed
-function. Whenever the execution encounters a branch, a corresponding branch
-will be created in the ExplodedGraph during the simulated interpretation. 
-Hence,
-branches lead to an exponential number of ExplodedNodes.
+environment. It builds up and traverses an inner model of the execution paths, 
+called ExplodedGraph, for every analyzed function.
+
+An important technical note that the building of the \texttt{ExplodedGraph} is 
+based on the \texttt{Control Flow Graph} (\texttt{CFG}) of the functions. The 
+\texttt{CFG} represents a source-level, intra-procedural control-flow of a 
+statement. This statement can potentially be an entire function body, or just a 
+single expression. The \texttt{CFG} consists of \texttt{CFGBlocks} which are 
+simply containers of statements. The \texttt{CFGBlocks}s essentially represents 
+the basic blocks of the code but can contain some extra custom information. So 
+for the sake of easier understanding TODO amikor azt mondjuk, hogy basic block, 
+akkor CFGBlock-ra gondolunk, de ez segit elkepzelni/ jobban 
+kifejezni/szemleletesebbe teszi a peldakat, ha basic blockot kepzelunk magunk 
+ele.
+
+So -- based on the function CFGs -- we build up an \texttt{ExplodedGraph}. A 
+node of this graph (called \texttt{ExplodedNode}) contains a 
+\texttt{ProgramPoint} (which determines the location) and a \texttt{State} 
+(which contains the known information at that point). Its paths from the root 
+to the leaves are modeling the different execution paths of the analyzed 
+function. Whenever the execution encounters a branch, a corresponding branch 
+will be created in the \texttt{ExplodedGraph} during the simulated 
+interpretation. 
+Hence, branches lead to an exponential number of ExplodedNodes.
 This combinatorial explosion is handled in the Static Analyzer by stopping 
-the
-analysis when given conditions are fulfilled. Ceasing the analyzation 
-process
-may cause loss of potential true positive results, but it is indispensable 
-for
-maintaining a reasonable resource consumption regarding the memory and CPU
-usage. These conditions are modeled by the concept of budget.
-The budget is a collection of limitations on the shape of the ExplodedGraph.
+the analysis when given conditions are fulfilled. Ceasing the analyzation 
+process may cause loss of potential true positive results, but it is 
+indispensable for maintaining a reasonable resource consumption regarding the 
+memory and CPU usage. These conditions are modeled by the concept of budget.
+The budget is a collection of limitations on the shape of the 
+\texttt{ExplodedGraph}.
 These limitations include:
 \begin{enumerate}  
-	\item The maximum number of traversed nodes in the ExplodedGraph. If 
+	\item The maximum number of traversed nodes in the \texttt{ExplodedGraph}. 
+	If 
 	this
 	number is reached then the analysis of the simulated function stops.
 	\item The size of the simulated call stack. When a function call is 
@@ -203,23 +210,16 @@ These limitations include:
 	then the analysis continues in its body as if it was inlined to the 
 	place of
 	call (interprocedural). There are several heuristics that may control 
-	the
-	behavior of inlining process. For example the too large functions are 
-	not
-	inlined at all, and the really short functions are not counted in the 
-	size of
-	call stack.
+	the	behavior of inlining process. For example the too large functions are 
+	not	inlined at all, and the really short functions are not counted in the 
+	size of	call stack.
 	\item The number of times a function is inlined. The idea behind this
 	constraint is that the more a function is analyzed, the less likely it 
-	is that a
-	bug will appear in it. If this number is reached then that function 
-	will not be
-	inlined again in this ExplodedGraph.
+	is that a 	bug will appear in it. If this number is reached then that 
+	function will not be inlined again in this \texttt{ExplodedGraph}.
 	\item The number of times a basic block is processed during the 
-	analysis. This
-	constraint limits the number of loop iterations. When this threshold is 
-	reached
-	the currently analyzed execution path will be aborted.
+	analysis. This	constraint limits the number of loop iterations. When this 
+	threshold is reached the currently analyzed execution path will be aborted.
 	The budget expression can be used in two ways. Sometimes it means the
 	collection of the limitations above, sometimes it refers to one of these
 	limitations. This will always be distinguishable from the context.
@@ -227,17 +227,16 @@ These limitations include:
 
 
 \section{Motivation}
-As already mentioned in the introduction, the analyzer handles loops quite
-simply in the current state. More precisely, it unrolls them 4 times by 
-default and then cuts the analysis of the path where the loop would have been 
-unrolled more than 4 times.
+Currently, the analyzer handles loops quite simply. More precisely, it unrolls 
+them 4 times by default and then cuts the analysis of the path where the loop 
+would have been unrolled more than 4 times. This behavior is reached by the 
+above presented basic block visiting budget.
 
 Loss in code coverage is one of the problems with this approach to loop
 modeling. Specifically, in cases where the loop is statically known to make 
-more
-than 4 steps, the analyzer do not analyze the code following the loop. 
-Thus, the
-naive loop handling (described above) could lead to entirely unchecked code.
+more than 4 steps, the analyzer do not analyze the code following the loop. 
+Thus, the naive loop handling (described above) could lead to entirely 
+unchecked code.
 Listing \ref{UnrollMot} shows a small example for that.
 
 \lstset{language=C,caption={Since the loop condition is known at every 
@@ -255,14 +254,10 @@ arr[i] = i;
 
 According to the budget rule concerning the basic block visit number, the
 analysis of the loop stops in the fourth iteration even if the loop 
-condition is
-simple enough to see that unrolling the whole loop would not be too much 
-extra
-work relatively. Running out of the budget implies (in this case) that the 
-rest
-of the function body remains unanalyzed, which may lead to not finding 
-potential
-bugs.
+condition is simple enough to see that unrolling the whole loop would not be 
+too much extra work relatively. Running out of the budget implies (in this 
+case) that the rest of the function body remains unanalyzed, which may lead to 
+not finding potential bugs.
 Another problem can be seen on Listing \ref{WidenMot}:
 \lstset{language=C++,caption={The loop condition is unknown but the 
 analyzer 
@@ -280,46 +275,36 @@ for (int i = 0; i < num(); ++i) {
 /*rest of the function, n < 4 */
 }\end{lstlisting}
 
-This code fragment results an analysis which keep track the values of 
-\texttt{n}
-and \texttt{i} variables (this information is stored in the State). In every
-iteration of the loop the values are updated accordingly. Note that 
+This code fragment results in an analysis which keeps track of the values of 
+\texttt{n} and \texttt{i} variables (this information is stored in the State). 
+In every iteration of the loop the values are updated accordingly. Note that 
 updating the
-State means a new node insertion in the ExplodedGraph with the new values. 
-Since
-the body of the \texttt{num()} function is not known, the analyzer can not 
-find
-out the its return value. Thus, it is considered as unknown. This 
-circumstance
-makes the graph split to two branches. The first one belongs to the symbolic
+State means that a new node is inserted to the \texttt{ExplodedGraph} with the 
+new 
+values. Since the body of the \texttt{num()} function is unknown, the 
+analyzer can not find out its return value. Thus it is considered as 
+unknown. This circumstance
+makes the graph split into two branches. The first one belongs to the symbolic
 execution of the loop body assuming that the loop condition is true. The 
-other
-one simulates the case where the condition is false and the execution 
-continues
-after the loop. This process is done for every loop iteration, however, the 
-4th
-time assuming the condition is true, the path will be cut short according 
-to the
-budget rule.
+other one simulates the case where the condition is false and the execution 
+continues after the loop. This process is done for every loop iteration, 
+however, the 4th time assuming the condition is true, the path will be cut 
+short according to the budget rule.
 Although the analyzer generates paths to simulate the code after the loop 
-in the
-above described case, yet the value of variable \texttt{n} will be always 
-less
-than 4 on these paths and the rest of the function will only be checked 
-assuming
-this constraint. This can result in coverage loss as well, since the 
-analyzer
-will ignore the paths where n is more than 4.
+in the above described case, yet the value of variable \texttt{n} will be 
+always less than 4 on these paths and the rest of the function will only be 
+checked assuming this constraint. This can result in coverage loss as well, 
+since the analyzer will ignore the paths where n is more than 4.
 
 \section{Proposed Solution}
 %The current loop handling method in the Clang Static Analyzer is too 
 %strict.
-In this section we present two solutions to resolve the previously mentioned
+In this section two solutions are presented to resolve the previously mentioned
 limitations on symbolic execution of loops in the Clang Static Analyzer. It 
 is important to note that these enhancements are incremental in the sense 
 that 
-on 	examples which are too complex to handle at the moment, we fall back to 
-the original method. For sake of simplicity in the following examples a 
+on examples which are too complex to handle at the moment, we fall back to 
+the original method. For the sake of simplicity in the following examples a 
 "division by zero" will illustrate the bug we intend to find.
 
 \subsection{Loop Unrolling Heuristics}
@@ -327,12 +312,10 @@ Loop unrolling means we have identified heuristics and patterns (such as
 loops
 with small number of branches and small known static bound) in order to find
 specific loops which are worth to be completely unrolled. This idea is 
-inspired
-by the following example:
+inspired by the following example:
 
-\lstset{language=C++,caption={Complete unrolling of the loop makes possible 
-to 
-		find the division by zero error.},label=UnrollEx}
+\lstset{language=C++,caption={Complete unrolling of the loop makes it possible 
+to find the division by zero error.},label=UnrollEx}
 \begin{lstlisting}
 void foo() {
 for (int i = 0; i < 6; i++){
@@ -347,49 +330,40 @@ In the current solution a loop has to fulfill the following conditions in
 order
 to be unrolled:
 \begin{enumerate}  
-	\item The loop condition should be arithmetically compare a variable -- 
+	\item The loop condition should arithmetically compare a variable -- 
 	which
 	is known at the beginning of the loop -- to a literal (like: 
 	\texttt{i~<~6} or
 	\texttt{6~$\ge$~i})
-	\item The loop should only change once the loop variable in its body 
-	and the
-	difference needs to be constant. (This way we can estimate the maximum 
-	number of
-	steps.)
-	\item The estimated number of steps should be less than 128. (Still do 
-	not want
-	to simulate loops which takes thousands of steps because they could 
-	single
-	handedly exhaust the budget.)
+	\item The loop should change the loop variable only once in its body 
+	and the	difference needs to be constant. (This way the maximum number of 
+	steps can be estimated.)
+	\item The estimated number of steps should be less than 128. (Simulating 
+	loops which takes thousands of steps because they could single handedly 
+	exhaust the budget.)
 	\item The loop must not generate new branches or use \texttt{goto} 
 	statements.
 \end{enumerate}
 
-Using this method we can successfully find the bug on the above example.
+By using this method, the bug on the Listing \ref{UnrollEx} example can be 
+found successfully.
 
 \subsection{Loop Widening}
 The final aim of widening is quite the same as the unrolling, to increase 
-the 
-coverage of the analysis. However, it reaches it in a very different way. 
+the coverage of the analysis. However, it reaches it in a very different way. 
 During widening the analyzer simulates the execution of an arbitrary number 
-of 
-iterations. There is already a solution which reaches this behavior by 
-discarding all of the known information before the last step of the loop. 
-So, 
-the analyzer creates the paths for the first 3 steps and simulate them as 
-usual, but the widening (means the invalidating) happens before the 4th 
-step in 
-order to not lose the first precise simulation branches. This way the 
-coverage 
-will be increased but can easily result in too much false positives. 
-Consider 
-the example on Listing \ref{WidenProb}.
+of iterations. The analyzer already has a widening algorithm, which reaches 
+this behavior by discarding all of the known information before the last step 
+of the loop. So, the analyzer creates the paths for the first 3 steps and 
+simulate them as usual, but the widening (means the invalidating) happens 
+before the 4th step in order to not lose the first precise simulation branches. 
+This way the coverage will be increased, however, this method is disabled by 
+default, since easily can result in too much false positives. Consider the 
+example on Listing \ref{WidenProb}.
 
 \lstset{language=C++,caption={Invalidating every known information (even 
-the 
-		ones which are not modified by the loop) can easily result false 
-		positives.},label=WidenProb}
+the ones which are not modified by the loop) can easily result false 	
+positives.},label=WidenProb}
 \begin{lstlisting}
 int num();
 void foo() {
@@ -404,33 +378,26 @@ n = 1/n; // False positive:
 // Division by zero
 }
 }\end{lstlisting}
-In this case the analyzer will create and check that impossible path where 
+In this case the analyzer will create and check that unfeasible path where 
 the
 variable \texttt{b} is false, so \texttt{n} is not incremented and lead 
-into a
-division by zero error. Since this execution path would never be performed 
-while
-running the analyzed program, it is considered a false positive. My aim was 
-to
-give a more precise approach for widening.
+into a division by zero error. Since this execution path would never be 
+performed 
+while running the analyzed program, it is considered a false positive. My aim 
+was to give a more precise approach for widening.
 
 The principles are that we try to continue the analysis after the block 
-visiting
-budget is exhausted but invalidate the information only on the variables 
-which
-are possibly modified by the loop. 
+visiting budget is exhausted but invalidate the information only on the 
+variables which are possibly modified by the loop. 
 For this I developed a solution which checks every possible way in which a
 variable can be modified in the loop. Then it evaluates these cases and if 
-it
-encounters a modified variable which cannot be handled by the invalidation
+it encounters a modified variable which cannot be handled by the invalidation
 process (e.g.: a pointer variable) then the loop will not be widened and we
 return to the conservative method. This mechanism ensures that we do not 
-create
-nodes containing invalid states.
+create nodes containing invalid states.
 This approach helps us to cover cases and find bugs like the one 
-illustrated on 
-Listing \ref{WidenEx}, and still not report false positives which are 
-represented on Listing \ref{WidenProb}.
+illustrated on Listing \ref{WidenEx}, and still not report false positives 
+which are represented on Listing \ref{WidenProb}.
 
 \lstset{language=C++,caption={Invalidating the information on only the 
 possible 
@@ -525,28 +492,35 @@ to be 7, so it will be able find the possible division by zero error.
 	
 \subsection{Infrastructure improvements}
 The discussed approaches heavily rely on informations that we are able to 
-determine the following things:
+perform the following actions:
 \begin{enumerate}
-	\item Decide on any \texttt{ExplodedNode} that it simulates a body of a 
-	loop or not.
-	\item The point of entering and exiting a loop on the simulated path.
+	\item Decide on any \texttt{ExplodedNode} if it simulates a body of a 
+	loop or not,
+	\item Recognize the entering and exiting point of a loop on the simulated 
+	path.
 \end{enumerate}
 
-However, these information were not provided by the analyzer earlier. We had to 
+However, these information were not provided by the analyzer earlier. Since the 
+lexical nature of the loops, their entrance and exit points can unambiguously 
+fit into the \texttt{CFG}. TODO
+The \texttt{ProgramPoint} contains the \texttt{LocationContext}
+
 \section{Evaluation}
 
 The effect of the described loop modeling approaches were measured on 
-various C/C++ open source project.
+various C/C++ open source project. These are the following:
 
 \begin{tabular}{ |c||c|c| } 
 	\hline
 	Project & LoC & Language \\
 	\hline
+	TinyXml & 20k & C++ \\
+	\hline
 	Curl & 21k & C  \\ 
 	\hline
 	Redis & 40k & C \\ 
 	\hline
-	Xerces & ??? & C++ \\ 
+	Xerces & 228k & C++ \\ 
 	\hline
 	Vim & 540k & C \\ 
 	\hline
@@ -642,28 +616,51 @@ various C/C++ open source project.
 \end{center}
 
 \section{Conclusion}
-Analysis of loops is always a hard task thus compromises have to be made. In
-Static Analyzer the technique of symvolic execution is used to simulate dynamic 
-behavior in static time by limiting the number of iterations the analyzer does. 
-This method fits in the current toolset which makes it implementable very easy.
 
-In this article I managed to extend the nodes of the exploded graph by some 
-custom information about loop processing and I implemented two methods by which 
-a bigger coverage could be reached. Unrolling the not too complex loops based 
-on some heuristics made it possible to continue the analysis after the loops 
-and widening loops made it possible to determine variable constraints which are 
-closer to reality.
-This study introduced two alternative approaches which can 
-extend the current one and can be applied simultaneously: 
-\begin{enumerate*} [label={(\arabic*)}, noitemsep]
-	\item with applied heuristics we determine loops worth to fully 
-	unroll
-	\item we use a widening mechanism to simulate arbitrary step of 
-	iteration.
-\end{enumerate*}
-These methods were evaluated on numerous open source projects, and were 
-proved to increase coverage in most of the cases. This work also laid the
-infrastructure for future loop modeling improvements.
+We introduced two alternative approaches for simulating loops during symbolic 
+execution. These were implemented and subsequently evaluated on various open 
+source projects, with a clear improvement of code coverage in general. With the 
+help of the new methods we are able to explore previously skipped, feasible 
+execution paths, especially when they were used combined. 
+
+The required changes done to the underlying infrastructure should also ease 
+implementing future enhancements. In particular, the information tracked by the 
+analysis about the location contexts has been expanded with additional fields.
+While code coverage was measured to have increased by an average of *x*, there 
+also was a noticeable performance penalty. In some cases, we observed a runtime 
+increase of *y*, with an average of ... . The number of simulated paths also 
+increased proportionally with the time taken, suggesting this time was well 
+spent.
+
+
+%Analysis of loops is always a hard task thus compromises have to be made.
+% In
+%Static Analyzer the technique of symbolic execution is used to simulate 
+%dynamic 
+% behavior in static time by limiting the number of iterations the analyzer 
+%does. 
+%This method fits in the current toolset which makes it implementable very easy.
+
+%In this article I managed to extend the nodes of the exploded graph by some 
+%custom information about loop processing and I implemented two methods by 
+%which 
+%a bigger coverage could be reached. Unrolling the not too complex loops based 
+%on some heuristics made it possible to continue the analysis after the loops 
+%and widening loops made it possible to determine variable constraints which 
+%are 
+%closer to reality.
+
+%This study introduced two alternative approaches which can 
+%extend the current one and can be applied simultaneously: 
+%\begin{enumerate*} [label={(\arabic*)}, noitemsep]
+%	\item with applied heuristics we determine loops worth to fully 
+%	unroll
+%	\item we use a widening mechanism to simulate arbitrary step of 
+%	iteration.
+%\end{enumerate*}
+%These methods were evaluated on numerous open source projects, and were 
+%proved to increase coverage in most of the cases. This work also laid the
+%infrastructure for future loop modeling improvements.
 \section{Future work}
 The heuristic patterns for completely unrolled loops could be extended to 
 involve loops which bound is a known variable which is not changed in the body. 
@@ -679,9 +676,10 @@ introducing pointer analysis algorithms to the analyzer could help to reach a
 more precise invalidation process.
 
 The infrastructural improvements enable the analyzer to provide entry points 
-for checkers on loop entrances/exits and identify the currently simulated loop 
-for every \texttt{ExplodedNode}. On top of these entry points new bug finding 
-modules (checkers) can be implemented.
+for the bug finding modules (checkers) on loop entrances/exits and identify the 
+currently simulated loop for every \texttt{ExplodedNode}. On top of these entry 
+points new checkers can be implemented.
+
 \acks
 
 Acknowledgments, if needed.
