@@ -810,6 +810,8 @@
 \long\def \toappear #1{%
   \def \@toappear {#1}}
 
+% Bassza meg a template.
+\iffalse
 \toappear{%
   \if \@legacycopyright%
   \if \@emptydefp{\@permission}%
@@ -838,11 +840,14 @@
   \if@printcopyright
     \copyright\ \@copyrightyear\ \@copyrightowner
   \fi
-  \if@acmowned ISBN \else\ifnum\acm@copyrightmode=2 \par ISBN \else\ifnum\acm@copyrightmode=8 \par ISBN \else\ifnum\acm@copyrightmode=9 \par ISBN \else \if@printcopyright \par\smallskip \fi ACM ISBN \fi\fi\fi\fi
+  \if@acmowned ISBN \else\ifnum\acm@copyrightmode=2 \par ISBN 
+  \else\ifnum\acm@copyrightmode=8 \par ISBN \else\ifnum\acm@copyrightmode=9 
+  \par ISBN \else \if@printcopyright \par\smallskip \fi ACM ISBN \fi\fi\fi\fi
   \@copyrightdata \dots \@reprintprice \par\smallskip
   \setcopyrightdoi
   \fi
   \fi}
+\fi
 
 \newcommand{\reprintprice}[1]{%
   \gdef \@reprintprice {#1}}

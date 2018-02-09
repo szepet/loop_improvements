@@ -1,5 +1,8 @@
 \documentclass{sigplanconf}
-
+%\settopmatter{printacmref=false} % Removes citation information below abstract
+%\renewcommand\footnotetextcopyrightpermission[1]{} % removes footnote with 
+%conference information in first column
+\pagestyle{plain} % removes running headers
 % The following \documentclass options may be useful:
 
 % preprint       Remove this option only once the paper is in final form.
@@ -16,7 +19,25 @@
 \usepackage{listings}  
 \usepackage{color}
 \usepackage[inline]{enumitem}
+\usepackage{booktabs} % For formal tables
+\usepackage{listings}
+\usepackage{parcolumns}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\usepackage{tikz}
 
+\usepgfplotslibrary{units}
+\usetikzlibrary{arrows, positioning}
+\usetikzlibrary{shapes}
+\setcopyright{none}
+%\newcommand\footnotetextcopyrightpermission[1]{} % removes footnote with 
+%conference information in first column
+\pagestyle{plain} % removes running headers 
+
+
+%\renewcommand\footnotetextcopyrightpermission[1]{}
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
 \definecolor{mymauve}{rgb}{0.58,0,0.82}
@@ -82,8 +103,7 @@
 	
 	% Uncomment the publication rights used.
 	%\setcopyright{acmcopyright}
-	\setcopyright{acmlicensed}  % default
-	
+	%\setcopyright{acmlicensed}  % default
 	%\setcopyright{rightsretained}
 	
 	%\titlebanner{banner above paper title}        % These are ignored unless
@@ -173,17 +193,17 @@
 	\texttt{CFGBlocks} 
 	as well for the sake of easier understanding and better illustration.
 	
-	During the analysis -- based on the function CFGs -- we build up an 
+	Thus during the analysis -- based on the function CFGs -- we build up an 
 	\texttt{ExplodedGraph}. A 
 	node of this graph (called \texttt{ExplodedNode}) contains a 
 	\texttt{ProgramPoint} (which determines the location) and a \texttt{State} 
-	(which contains the known information at that point). Its paths from the 
+	(which contains any known information at that point). Its paths from the 
 	root 
 	to the leaves are modeling the different execution paths of the analyzed 
 	function. Whenever the execution encounters a branch, a corresponding 
 	branch 
 	will be created in the \texttt{ExplodedGraph} during the simulated 
-	interpretation. 
+	interpretation.
 	Hence, branches lead to an exponential number of \texttt{ExplodedNode}s.
 	This combinatorial explosion is handled in the Static Analyzer by stopping 
 	the analysis when given conditions are fulfilled. Terminating the analysis 
@@ -590,9 +610,7 @@
 	\end{tabular}
 	
 	\subsection{Coverage and the number of explored paths}
-	These statisics are produced by the analyzer (már benne van, ezt valahogy 
-	ertelmesen elmondani, hogy ezert valid es nem en szoptam ossze az eterbol). 
-	The 
+	These statisics are produced by the analyzer. The 
 	coverage percentage is based on the ratio of the visited and the total 
 	number 
 	of basic blocks in the analyzed functions, which results in a small 
@@ -654,7 +672,8 @@
 	influence on the coverage in the average case. However, the complete unroll 
 	of 
 	specific loops could result in a higher coverage as well (e.g. Curl, Redis).
-	In general, enabling both of them was the most beneficial in respect of the 
+	In general, enabling both of them was the most beneficial with respect to 
+	the 
 	coverage.
 	
 	\begin{table}[!htb]
@@ -663,21 +682,21 @@
 			\hline
 			Project & Normal & Unroll & Widen & U + W \\
 			\hline \hline
-			TinyXML & 14452 & 15460 & 14765 &	15773  \\ 
+			TinyXML & 14\,452 & 15\,460 & 14\,765 & 15\,773 \\ 
 			\hline
-			Curl & 18272 & 18577 & 28835 & 24279 \\ 
+			Curl & 18\,272 & 18\,577 & 28\,835 & 24\,279 \\
 			\hline
-			Redis & 69857 & 70097 & 98446 & 100929 \\ 
+			Redis & 69\,857 & 70\,097 & 98\,446 & 100\,929 \\ 
 			\hline
-			Xerces & 395615 & 398077 & 430989 &	433358 \\ 
+			Xerces & 395\,615 & 398\,077 & 430\,989 & 433\,358 \\ 
 			\hline
-			Vim & 155451 & 157266 & 188136 & 173121 \\ 
+			Vim & 155\,451 & 157\,266 & 188\,136 & 173\,121 \\ 
 			\hline
-			OpenSSL & 687175 & 687932 & 700464 & 701013 \\ 
+			OpenSSL & 687\,175 & 687\,932 & 700\,464 & 701\,013 \\ 
 			\hline
-			PostgreSQL & 382660 & 383874 & 453188 & 419118  \\ 
+			PostgreSQL & 382\,660 & 383\,874 & 453\,188 & 419\,118  \\ 
 			\hline
-			FFmpeg & 466613 & 458480 & 571399 & 521725  \\ 		
+			FFmpeg & 466\,613 & 458\,480 & 571\,399 & 521\,725  \\ 		
 			\hline
 		\end{tabular}
 		\caption{The numbers of explored execution paths using different loop 
@@ -692,8 +711,19 @@
 	approach on the FFmpeg project, which caused the budget limiting the number 
 	of 
 	traversed \texttt{ExplodedNode}s to exhaust earlier, slightly decreasing 
-	the number of checked paths. Enabling both of the features resulted similar 
-	or less number of explored than the runs using only widening. It was the 
+	the number of checked paths. Enabling both of the features resulted in 
+	similar or 
+	fewer number of explored paths than the runs using only widening. 
+	This effect can be explained in two ways:   
+	\begin{enumerate*} [label={(\arabic*)}, noitemsep]
+		\item the analyzer prefers to completely unroll loops rather than widen 
+		them, 
+		which results in a more precise modeling of the state and can exclude 
+		unfeasible 
+		paths,
+		\item the simultaneous use of the methods can lead to exhausting the 
+		budget on earlier paths, where the analysis will be terminated.
+	\end{enumerate*}
 	
 	\subsection{Found bugs}
 	
@@ -703,21 +733,21 @@
 			\hline
 			Project & Normal & Unroll & Widen & U + W \\
 			\hline \hline
-			TinyXML & 1 & 1 & 3 & 3 \\
+			TinyXML & 1 & 1 & 3 & 3 (+200\%) \\
 			\hline
-			Curl & 16 & 16 & 16 & 16 \\ 
+			Curl & 16 & 16 & 16 & 16 (0\%) \\ 
 			\hline
-			Redis & 55 & 58 & 55 & 59 \\ 
+			Redis & 55 & 58 & 55 & 59 (+7.27\%) \\ 
 			\hline
-			Xerces & 62 & 62 & 61 & 61 \\ 
+			Xerces & 62 & 62 & 61 & 61 (-1.61\%) \\ 
 			\hline
-			Vim & 74 & 74 & 76 & 78 \\
+			Vim & 74 & 74 & 76 & 78 (+5.4\%) \\
 			\hline
-			OpenSSL & 152 & 152 & 153 & 153 \\ 
+			OpenSSL & 152 & 152 & 153 & 153 (+0.66\%) \\ 
 			\hline
-			PostgreSQL & 323 & 323 & 327 & 331 \\ 
+			PostgreSQL & 323 & 323 & 327 & 331 (+2.48\%) \\ 
 			\hline
-			FFmpeg & 425 & 420 & 423 & 454 \\ 		
+			FFmpeg & 425 & 420 & 423 & 454 (+6.82\%) \\ 		
 			\hline
 		\end{tabular}
 		\caption{The number of bug reports produced by the analyzer.} 
@@ -725,11 +755,16 @@
 	\end{table}
 	The number of bug reports using the different loop modeling methods can be 
 	seen
-	on Table \ref{tab:reportnum}. The increase in analysis coverage and number 
-	of checked path usually implies that the number of the found bugs will be 
-	increased as well. This can be observed on these numbers as well, however,
-	the increase rate of the found bugs is higher. But if we figyelembe 
-	vesszuk, that how much more paths we simulated.
+	in Table \ref{tab:reportnum}. The increase in analysis coverage and in the 
+	number of 
+	checked paths usually implies an increased number of found bugs, which 
+	indeed can be 
+	observed on the numbers. However, it is important to note that the upsurge 
+	of the number 
+	of explored execution paths described in Table \ref{tab:pathnum} 
+	considerably outweighs 
+	the moderate rise in the number of bug reports.
+	
 	\subsection{Analysis time}
 	
 	\begin{table}[!htb]
@@ -738,28 +773,33 @@
 			\hline
 			Project & Normal & Unroll & Widen & U + W \\
 			\hline \hline
-			TinyXML & 0:51 & 0:51 & 0:52 & 0:52 \\ 
+			TinyXML & 0:51 & 0:51 & 0:52 & 0:52 (+2\%) \\ 
 			\hline
-			Curl & 0:50 & 1:06 & 0:55 & 1:10 \\ 
+			Curl & 0:50 & 1:06 & 0:55 & 1:05 (+30\%) \\ 
 			\hline
-			Redis & 2:06 & 2:11 & 2:28 & 2:10 \\ 
+			Redis & 2:06 & 2:11 & 2:28 & 2:10 (+3\%) \\ 
 			\hline
-			Xerces & 3:38 & 3:34 & 3:37 & 3:39 \\ 
+			Xerces & 3:38 & 3:34 & 3:37 & 3:39 (+0.5\%) \\ 
 			\hline
-			Vim & 3:11 & 3:26 & 3:18 & 3:27 \\ 
+			Vim & 3:11 & 3:26 & 3:18 & 3:27 (+3\%) \\
 			\hline
-			OpenSSL & 2:04 & 2:22 & 2:13 & 2:19 \\ 
+			OpenSSL & 2:04 & 2:22 & 2:13 & 2:19 (+8.3\%) \\
 			\hline
-			PostgreSQL & 7:03 & 8:32 & 7:48 & 7:59 \\ 
+			PostgreSQL & 7:03 & 8:32 & 7:48 & 7:59 (+13\%) \\
 			\hline
-			FFmpeg & 9:40 & 10:22 & 10:14 & 11:20 \\ 		
+			FFmpeg & 9:40 & 10:22 & 10:14 & 11:20 (+17\%) \\
 			\hline
 		\end{tabular}
 		\caption{Average measured time of the analysis expressed in minutes. 
 			(Average of 5 runs.)}\label{tab:time}
-	\end{table}
-	The running time on the different projects are represented on Table 
-	\ref{tab:time}.
+	\end{table} 
+	The running time on different projects is showed in Table \ref{tab:time}.
+	Although the widening method lead into more analyzed execution paths, the 
+	analysis time increase was more intense after enabling the unrolling 
+	process. This is possible due to the fact that unrolling leads to long 
+	paths, where the \texttt{State} usually contains more information 
+	(constraints on variable values), which is very expensive in respect of 
+	running time. 
 	
 	\section{Conclusion}
 	
@@ -778,14 +818,17 @@
 	implementation of future enhancements. In particular, information tracked 
 	by the 
 	analysis about location contexts were expanded with additional fields.
-	While code coverage was measured to have increased by an average of *x*, 
+	While code coverage was measured to have increased by an average of 1.2\% , 
 	there 
 	also was a noticeable performance penalty. In some cases, we observed a 
 	runtime 
-	increase of *y*, with an average of ... . The number of simulated paths 
+	increase of 15\%, with an average of 6\% . The number of simulated paths 
 	also 
 	increased proportionally with the time taken, suggesting this time was well 
-	spent.
+	spent. In conclusion, if the user does not mind taking 10-15\% more time
+	for a more comprehensive analysis, then it is beneficial to enable the 
+	proposed
+	feature set by default. 
 	
 	\section{Future work}
 	The heuristic patterns for completely unrolled loops could be extended to 
@@ -815,12 +858,13 @@
 	points new checkers can be implemented.
 	
 	\acks
-	I would like to thank my main mentor of GSoC, Artem Dergachev for his 
-	advices and guidance on getting to know the core of the Static Analyzer. 
-	Furthermore, I would like to thank the members of the CodeChecker team from 
-	Ericsson for their valueable and useful suggestions on the paper. 
-	%especially for my honoured and best friend, master of C++ and all 
-	%information sciences, Tibor Brunner. 
+	I would like to thank my main mentor of \texttt{GSoC}, Artem Dergachev for 
+	his advice and guidance on getting to know the core of the Static Analyzer. 
+	Furthermore, I would like to thank the members of the \texttt{CodeChecker} 
+	team at Ericsson for their valuable and helpful suggestions on the paper. 
+	UNKO %especially for my honored and best friend, master of C++ and all 
+	%information sciences, Tibor Brunner. %%% THIS NEEDS TO BE IN THE FINAL 
+	%%%%VERSION %%% GOT IT
 	
 	% The 'abbrvnat' bibliography style is recommended.
 	
